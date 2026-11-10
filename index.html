@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f6fb">
+  <meta name="description" content="健康记录：记录每日饮水和跑步、健身、拉伸，数据保存在当前浏览器。">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="健康记录">
+  <meta name="color-scheme" content="light">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="健康记录 · 今日饮水与运动">
+  <meta property="og:description" content="记录每日饮水和跑步、健身、拉伸，数据只保存在你的浏览器。">
+  <meta name="twitter:card" content="summary">
+  <title>健康记录 · 今日饮水与运动</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-glow" aria-hidden="true"></div>
+
+  <header class="app-header">
+    <div class="app-header__inner">
+      <div class="avatar" aria-hidden="true">💧</div>
+      <div class="identity">
+        <span class="brand">健康记录</span>
+        <div class="identity__row">
+          <h1 class="nickname" id="nicknameText">小水滴</h1>
+          <button
+            class="icon-button edit-nickname"
+            id="editNicknameBtn"
+            type="button"
+            aria-label="修改昵称"
+            aria-expanded="false"
+            aria-controls="nicknameEditor"
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+              <path d="M4 20h4.2L19 9.2 14.8 5 4 15.8V20Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              <path d="m12.9 6.9 4.2 4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <time class="today-chip" id="todayChip">11月10日 周一</time>
+    </div>
+
+    <form class="nickname-editor" id="nicknameEditor" hidden>
+      <label class="sr-only" for="nicknameInput">昵称</label>
+      <input
+        id="nicknameInput"
+        name="nickname"
+        type="text"
+        maxlength="12"
+        autocomplete="nickname"
+        enterkeyhint="done"
+        placeholder="给自己取个昵称"
+      >
+      <button class="small-primary" type="submit">保存</button>
+      <button class="small-ghost" type="button" id="cancelNicknameBtn">取消</button>
+    </form>
+  </header>
+
+  <main class="app-main">
+    <section class="card water-card" aria-labelledby="waterTitle">
+      <div class="card-heading">
+        <div class="section-icon section-icon--water" aria-hidden="true">💧</div>
+        <div class="card-heading__text">
+          <h2 id="waterTitle">今日饮水</h2>
+          <p>目标 2,000 ml · 每次 250 ml</p>
+        </div>
+        <span class="status-pill" id="waterStatus">未开始</span>
+      </div>
+
+      <div class="water-overview">
+        <div
+          class="ring-wrap"
+          id="waterProgress"
+          role="progressbar"
+          aria-label="饮水目标进度"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <svg class="goal-ring" viewBox="0 0 132 132" aria-hidden="true">
+            <defs>
+              <linearGradient id="waterGradient" x1="18" y1="14" x2="116" y2="118" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#63cdff"/>
+                <stop offset=".55" stop-color="#2b93ff"/>
+                <stop offset="1" stop-color="#0d63f3"/>
+              </linearGradient>
+            </defs>
+            <circle class="goal-ring__track" cx="66" cy="66" r="56"></circle>
+            <circle class="goal-ring__value" id="waterRing" cx="66" cy="66" r="56"></circle>
+          </svg>
+          <div class="ring-center">
+            <div class="ring-total">
+              <strong id="waterTotal">0</strong><span>ml</span>
+            </div>
+            <span class="ring-label">今日已饮</span>
+          </div>
+        </div>
+
+        <div class="water-stats">
+          <div class="stat">
+            <span class="stat__label">完成</span>
+            <strong class="stat__value" id="waterPercent">0%</strong>
+          </div>
+          <div class="stat">
+            <span class="stat__label">剩余</span>
+            <strong class="stat__value" id="waterRemainingPct">100%</strong>
+          </div>
+          <div class="stat stat--wide">
+            <span class="stat__label">距离目标</span>
+            <strong><span id="waterRemaining">2,000</span> ml</strong>
+          </div>
+          <p class="water-note" id="waterNote">第一杯水，等你来记录。</p>
+        </div>
+      </div>
+
+      <button class="water-button" id="addWaterBtn" type="button">
+        <span class="water-button__icon" aria-hidden="true">+</span>
+        <span>记录 250 ml</span>
+      </button>
+
+      <div class="record-block">
+        <div class="record-heading">
+          <h3>饮水记录</h3>
+          <span id="waterCount">0 次</span>
+        </div>
+        <ul class="record-list" id="waterRecordList" aria-label="今日饮水记录"></ul>
+        <div class="empty-state" id="waterEmpty">
+          <span class="empty-state__icon" aria-hidden="true">🥛</span>
+          <span>还没有饮水记录，点上方按钮记下第一杯水吧。</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card exercise-card" aria-labelledby="exerciseTitle">
+      <div class="card-heading">
+        <div class="section-icon section-icon--exercise" aria-hidden="true">🏃</div>
+        <div class="card-heading__text">
+          <h2 id="exerciseTitle">今日运动</h2>
+          <p>跑步 · 健身 · 拉伸</p>
+        </div>
+        <span class="status-pill status-pill--exercise" id="exerciseTotal">0 分钟</span>
+      </div>
+
+      <div class="exercise-switch" id="exerciseSwitch" role="tablist" aria-label="选择运动项目">
+        <button class="exercise-tab" type="button" role="tab" aria-selected="true" data-exercise="run">
+          <span class="exercise-tab__emoji" aria-hidden="true">🏃</span>
+          <span>跑步</span>
+        </button>
+        <button class="exercise-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-exercise="fitness">
+          <span class="exercise-tab__emoji" aria-hidden="true">🏋️</span>
+          <span>健身</span>
+        </button>
+        <button class="exercise-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-exercise="stretch">
+          <span class="exercise-tab__emoji" aria-hidden="true">🧘</span>
+          <span>拉伸</span>
+        </button>
+      </div>
+
+      <div class="exercise-form-box" id="exerciseFormBox">
+        <p class="form-hint" id="exerciseHint">
+          <span aria-hidden="true">🏃</span>
+          <span id="exerciseHintText">记录今天的跑步公里数和时长。</span>
+        </p>
+
+        <form id="exerciseForm" novalidate>
+          <div class="field-row" id="runFields">
+            <label class="field">
+              <span class="field__label">公里数</span>
+              <span class="input-shell">
+                <input
+                  id="runKmInput"
+                  name="kilometers"
+                  type="number"
+                  inputmode="decimal"
+                  min="0.1"
+                  max="200"
+                  step="0.1"
+                  placeholder="如 3.5"
+                  autocomplete="off"
+                >
+                <span class="unit">km</span>
+              </span>
+            </label>
+            <label class="field">
+              <span class="field__label">分钟</span>
+              <span class="input-shell">
+                <input
+                  id="runMinutesInput"
+                  name="minutes"
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  max="1440"
+                  step="1"
+                  placeholder="如 30"
+                  autocomplete="off"
+                >
+                <span class="unit">min</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="field-row field-row--single" id="minuteFields" hidden>
+            <label class="field">
+              <span class="field__label" id="minuteFieldLabel">健身时长</span>
+              <span class="input-shell">
+                <input
+                  id="minutesInput"
+                  name="minutes"
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  max="1440"
+                  step="1"
+                  placeholder="如 30"
+                  autocomplete="off"
+                >
+                <span class="unit">min</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="quick-picks" id="minuteQuickPicks" hidden aria-label="常用时长">
+            <button class="quick-pick" type="button" data-minutes="15">15 分钟</button>
+            <button class="quick-pick" type="button" data-minutes="30">30 分钟</button>
+            <button class="quick-pick" type="button" data-minutes="45">45 分钟</button>
+            <button class="quick-pick" type="button" data-minutes="60">60 分钟</button>
+          </div>
+
+          <p class="form-error" id="exerciseError" role="alert" hidden></p>
+
+          <button class="exercise-submit" id="saveExerciseBtn" type="submit">
+            <span aria-hidden="true">＋</span>
+            <span id="saveExerciseLabel">记录跑步</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="record-block record-block--exercise">
+        <div class="record-heading">
+          <h3>今日已记录</h3>
+          <span id="exerciseCount">0 项</span>
+        </div>
+        <div class="exercise-summary" id="exerciseSummary"></div>
+        <div class="empty-state" id="exerciseEmpty">
+          <span class="empty-state__icon" aria-hidden="true">✨</span>
+          <span>今天还没有运动记录，选一个项目开始吧。</span>
+        </div>
+      </div>
+    </section>
+
+    <p class="privacy-note">
+      无需登录 · 昵称和记录仅保存在当前浏览器<br>
+      今天也要好好照顾自己。
+    </p>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
