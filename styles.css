@@ -148,6 +148,22 @@ input:focus-visible {
   min-width: 0;
 }
 
+.version-mark {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border: 1px solid rgba(20, 115, 255, 0.09);
+  border-radius: 999px;
+  background: rgba(234, 243, 255, 0.9);
+  color: #6d8fbd;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
 .brand {
   display: block;
   margin-bottom: 1px;
