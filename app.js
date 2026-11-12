@@ -7,9 +7,10 @@
   const WATER_GOAL = 2000;
   const WATER_STEP = 250;
   const RING_CIRCUMFERENCE = 2 * Math.PI * 56;
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  const MAX_RECORDS = 1200;
+  const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000;
+  const MIN_DATE_KEY = "2000-01-01";
   const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  const MONTH_LABELS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 
   const EXERCISES = {
     run: {
@@ -75,6 +76,12 @@
     waterNote: document.querySelector("#waterNote"),
     waterStatus: document.querySelector("#waterStatus"),
     addWaterBtn: document.querySelector("#addWaterBtn"),
+    addWaterLabel: document.querySelector("#addWaterLabel"),
+    waterDateRow: document.querySelector("#waterDateRow"),
+    waterDateInput: document.querySelector("#waterDateInput"),
+    waterDateBadge: document.querySelector("#waterDateBadge"),
+    waterDateReset: document.querySelector("#waterDateReset"),
+    waterBackfillNote: document.querySelector("#waterBackfillNote"),
     waterRecordList: document.querySelector("#waterRecordList"),
     waterEmpty: document.querySelector("#waterEmpty"),
     waterCount: document.querySelector("#waterCount"),
@@ -100,12 +107,29 @@
     exerciseSummary: document.querySelector("#exerciseSummary"),
     exerciseEmpty: document.querySelector("#exerciseEmpty"),
     exerciseCount: document.querySelector("#exerciseCount"),
+    exerciseDateRow: document.querySelector("#exerciseDateRow"),
+    exerciseDateInput: document.querySelector("#exerciseDateInput"),
+    exerciseDateBadge: document.querySelector("#exerciseDateBadge"),
+    exerciseDateReset: document.querySelector("#exerciseDateReset"),
+    exerciseBackfillNote: document.querySelector("#exerciseBackfillNote"),
+    historyDay: document.querySelector("#historyDay"),
+    calendarMonthLabel: document.querySelector("#calendarMonthLabel"),
+    calendarTodayHint: document.querySelector("#calendarTodayHint"),
+    calendarGrid: document.querySelector("#calendarGrid"),
+    prevMonthBtn: document.querySelector("#prevMonthBtn"),
+    nextMonthBtn: document.querySelector("#nextMonthBtn"),
+    calendarTodayBtn: document.querySelector("#calendarTodayBtn"),
     toast: document.querySelector("#toast"),
   };
 
   let selectedExercise = "run";
-  let currentDayKey = getDayKey(new Date());
   let state = loadState();
+  let currentDayKey = getDayKey(Date.now());
+  let waterDraftDateKey = currentDayKey;
+  let exerciseDraftDateKey = currentDayKey;
+  let selectedHistoryDate = currentDayKey;
+  let historyMonth = getBeijingParts(Date.now()).month;
+  let historyYear = getBeijingParts(Date.now()).year;
   let toastTimer = 0;
   let storageWarningShown = false;
 
@@ -175,13 +199,12 @@
     const records = [];
     const seenIds = new Set();
     const sourceRecords = Array.isArray(raw.records) ? raw.records : [];
-    const cutoff = Date.now() - 180 * DAY_MS;
 
     for (const item of sourceRecords) {
       if (!item || typeof item !== "object") continue;
 
       const ts = Number(item.ts);
-      if (!Number.isFinite(ts) || ts <= 0 || ts < cutoff) continue;
+      if (!Number.isFinite(ts) || ts <= 0) continue;
 
       const kind = item.kind;
       if (kind !== "water" && !EXERCISE_ORDER.includes(kind)) continue;
@@ -232,9 +255,6 @@
     }
 
     records.sort((a, b) => a.ts - b.ts);
-    if (records.length > MAX_RECORDS) {
-      records.splice(0, records.length - MAX_RECORDS);
-    }
 
     return {
       nickname,
@@ -276,10 +296,14 @@
     }
   }
 
-  function todayRecords() {
+  function recordsForDay(dayKey) {
     return state.records.filter(
-      (record) => getDayKey(new Date(record.ts)) === currentDayKey
+      (record) => getDayKey(record.ts) === dayKey
     );
+  }
+
+  function todayRecords() {
+    return recordsForDay(currentDayKey);
   }
 
   function colorFor(kind) {
@@ -293,14 +317,16 @@
     renderWater();
     renderExercise();
     renderExerciseForm();
+    syncRecordDateControls();
+    renderHistory();
   }
 
   function renderDate() {
-    const now = new Date();
-    dom.todayChip.textContent = `${now.getMonth() + 1}月${now.getDate()}日 ${
-      WEEKDAYS[now.getDay()]
+    const parts = getBeijingParts(Date.now());
+    dom.todayChip.textContent = `${parts.month + 1}月${parts.day}日 ${
+      WEEKDAYS[parts.weekday]
     }`;
-    dom.todayChip.dateTime = getDayKey(now);
+    dom.todayChip.dateTime = currentDayKey;
     dom.nicknameText.textContent = state.nickname;
     dom.nicknameText.title = state.nickname;
   }
@@ -383,7 +409,23 @@
     dom.exerciseEmpty.hidden = recordedKinds.length > 0;
     dom.exerciseSummary.hidden = recordedKinds.length === 0;
 
-    const groups = recordedKinds.map((kind) => {
+    const groups = buildExerciseGroups(records, {
+      subheading: "今日合计",
+      ariaLabelPrefix: "今日",
+    });
+    dom.exerciseSummary.replaceChildren(...groups);
+    renderExerciseTabs();
+  }
+
+  function buildExerciseGroups(
+    records,
+    { subheading = "今日合计", ariaLabelPrefix = "今日" } = {}
+  ) {
+    const recordedKinds = EXERCISE_ORDER.filter((kind) =>
+      records.some((record) => record.kind === kind)
+    );
+
+    return recordedKinds.map((kind) => {
       const info = EXERCISES[kind];
       const color = colorFor(kind);
       const kindRecords = records
@@ -416,9 +458,9 @@
       title.className = "exercise-group__title";
       const heading = document.createElement("h4");
       heading.textContent = info.label;
-      const subheading = document.createElement("p");
-      subheading.textContent = "今日合计";
-      title.append(heading, subheading);
+      const subheadingElement = document.createElement("p");
+      subheadingElement.textContent = subheading;
+      title.append(heading, subheadingElement);
 
       const total = document.createElement("div");
       total.className = "exercise-group__total";
@@ -438,7 +480,7 @@
 
       const list = document.createElement("ul");
       list.className = "exercise-records";
-      list.setAttribute("aria-label", `${info.label}今日记录`);
+      list.setAttribute("aria-label", `${info.label}${ariaLabelPrefix}记录`);
       kindRecords.forEach((record) => {
         const text = document.createElement("span");
         text.textContent =
@@ -459,9 +501,6 @@
       group.append(head, list);
       return group;
     });
-
-    dom.exerciseSummary.replaceChildren(...groups);
-    renderExerciseTabs();
   }
 
   function renderExerciseTabs() {
@@ -496,9 +535,10 @@
     dom.minuteFieldLabel.textContent = `${info.label}时长`;
     dom.minutesInput.placeholder = selectedExercise === "stretch" ? "如 10" : "如 30";
     hideExerciseError();
+    syncDateControl("exercise");
   }
 
-  function createRecordRow({ record, text, label }) {
+  function createRecordRow({ record, text, label, ariaDate = "" }) {
     const item = document.createElement("li");
     item.className = "record-item";
 
@@ -523,27 +563,463 @@
     undo.className = "undo-button";
     undo.textContent = "×";
     undo.dataset.removeId = record.id;
-    undo.setAttribute("aria-label", `撤销 ${formatTime(record.ts)} 的${label}记录`);
+    undo.setAttribute(
+      "aria-label",
+      `撤销 ${ariaDate ? `${ariaDate} ` : ""}${formatTime(record.ts)} 的${label}记录`
+    );
     undo.title = "撤销这条记录";
 
     item.append(time, dot, textElement, undo);
     return item;
   }
 
+  /* ---------- record date / backfill ---------- */
+
+  function getDraftDateKey(kind) {
+    return kind === "water" ? waterDraftDateKey : exerciseDraftDateKey;
+  }
+
+  function setDraftDateKey(kind, dateKey) {
+    if (kind === "water") {
+      waterDraftDateKey = dateKey;
+    } else {
+      exerciseDraftDateKey = dateKey;
+    }
+  }
+
+  function syncRecordDateControls() {
+    syncDateControl("water");
+    syncDateControl("exercise");
+  }
+
+  function syncDateControl(kind) {
+    const isWater = kind === "water";
+    const dateKey = getDraftDateKey(kind);
+    const isToday = dateKey === currentDayKey;
+    const refs = isWater
+      ? {
+          row: dom.waterDateRow,
+          input: dom.waterDateInput,
+          badge: dom.waterDateBadge,
+          reset: dom.waterDateReset,
+          note: dom.waterBackfillNote,
+        }
+      : {
+          row: dom.exerciseDateRow,
+          input: dom.exerciseDateInput,
+          badge: dom.exerciseDateBadge,
+          reset: dom.exerciseDateReset,
+          note: dom.exerciseBackfillNote,
+        };
+
+    refs.input.max = currentDayKey;
+    refs.input.value = dateKey;
+    refs.row.classList.toggle("is-backfill", !isToday);
+    refs.badge.textContent = isToday ? "今天" : "补记";
+    refs.reset.hidden = isToday;
+    refs.note.hidden = isToday;
+    refs.note.textContent = isToday
+      ? ""
+      : `这笔${isWater ? "饮水" : "运动"}会计入 ${formatShortDate(
+          dateKey
+        )}，不计入今天。`;
+
+    if (isWater) {
+      dom.addWaterLabel.textContent = isToday
+        ? "记录 250 ml"
+        : `补记 250 ml 到 ${formatShortDate(dateKey)}`;
+    } else {
+      const info = EXERCISES[selectedExercise];
+      dom.saveExerciseLabel.textContent = isToday
+        ? info.action
+        : `补记${info.label} · ${formatShortDate(dateKey)}`;
+    }
+  }
+
+  function handleDraftDateChange(kind) {
+    const input =
+      kind === "water" ? dom.waterDateInput : dom.exerciseDateInput;
+    const dateKey = input.value;
+
+    if (!dateKey) {
+      setDraftDateKey(kind, currentDayKey);
+      syncDateControl(kind);
+      return;
+    }
+
+    if (!isValidDayKey(dateKey) || dateKey < MIN_DATE_KEY) {
+      showToast("请选择有效的日期");
+      setDraftDateKey(kind, currentDayKey);
+      syncDateControl(kind);
+      return;
+    }
+
+    if (dateKey > currentDayKey) {
+      showToast("不能记录到未来日期");
+      setDraftDateKey(kind, currentDayKey);
+      syncDateControl(kind);
+      return;
+    }
+
+    setDraftDateKey(kind, dateKey);
+    syncDateControl(kind);
+  }
+
+  function resetDraftDate(kind) {
+    setDraftDateKey(kind, currentDayKey);
+    syncDateControl(kind);
+  }
+
+  function validateRecordDate(dateKey) {
+    if (!isValidDayKey(dateKey) || dateKey < MIN_DATE_KEY) {
+      showToast("请选择有效的记录日期");
+      return false;
+    }
+    if (dateKey > currentDayKey) {
+      showToast("不能记录到未来日期");
+      return false;
+    }
+    return true;
+  }
+
+  function getRecordTimestamp(dateKey) {
+    if (dateKey === currentDayKey) {
+      return Date.now();
+    }
+    const now = getBeijingParts(Date.now());
+    return Date.parse(
+      `${dateKey}T${pad2(now.hours)}:${pad2(now.minutes)}:${pad2(
+        now.seconds
+      )}+08:00`
+    );
+  }
+
+  /* ---------- history ---------- */
+
+  function renderHistory() {
+    renderCalendar();
+    renderHistoryDay();
+  }
+
+  function renderCalendar() {
+    const now = getBeijingParts(Date.now());
+    const monthKey = `${historyYear}-${pad2(historyMonth + 1)}`;
+    const currentMonthKey = `${now.year}-${pad2(now.month + 1)}`;
+
+    dom.calendarMonthLabel.textContent = `${historyYear}年${
+      MONTH_LABELS[historyMonth]
+    }月`;
+    dom.calendarTodayHint.textContent = `今天 ${now.month + 1}月${now.day}日`;
+    dom.nextMonthBtn.disabled = monthKey >= currentMonthKey;
+    dom.prevMonthBtn.disabled =
+      historyYear < 2000 || (historyYear === 2000 && historyMonth === 0);
+
+    const recordDays = new Set();
+    state.records.forEach((record) => {
+      recordDays.add(getDayKey(record.ts));
+    });
+
+    const firstWeekday = new Date(
+      Date.UTC(historyYear, historyMonth, 1)
+    ).getUTCDay();
+    const leadingBlanks = (firstWeekday + 6) % 7;
+    const daysInMonth = new Date(
+      Date.UTC(historyYear, historyMonth + 1, 0)
+    ).getUTCDate();
+    const cells = [];
+
+    for (let index = 0; index < leadingBlanks; index += 1) {
+      const blank = document.createElement("span");
+      blank.className = "calendar-blank";
+      blank.setAttribute("aria-hidden", "true");
+      cells.push(blank);
+    }
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const dateKey = `${historyYear}-${pad2(historyMonth + 1)}-${pad2(day)}`;
+      const weekday = new Date(
+        Date.UTC(historyYear, historyMonth, day)
+      ).getUTCDay();
+      const isToday = dateKey === currentDayKey;
+      const isFuture = dateKey > currentDayKey;
+      const isSelected = dateKey === selectedHistoryDate;
+      const hasRecord = recordDays.has(dateKey);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "calendar-day";
+      button.dataset.date = dateKey;
+      button.textContent = String(day);
+      button.disabled = isFuture;
+      button.setAttribute("aria-pressed", String(isSelected));
+      button.setAttribute(
+        "aria-label",
+        `${historyYear}年${historyMonth + 1}月${day}日 ${WEEKDAYS[weekday]}${
+          isToday ? "，今天" : ""
+        }${hasRecord ? "，有记录" : "，暂无记录"}`
+      );
+      if (hasRecord) button.classList.add("has-record");
+      if (isToday) {
+        button.classList.add("is-today");
+        button.setAttribute("aria-current", "date");
+      }
+      if (isSelected) button.classList.add("is-selected");
+      if (isFuture) button.setAttribute("aria-disabled", "true");
+      cells.push(button);
+    }
+
+    dom.calendarGrid.replaceChildren(...cells);
+  }
+
+  function renderHistoryDay() {
+    const parts = getBeijingParts(parseDayKeyTimestamp(selectedHistoryDate));
+    const isToday = selectedHistoryDate === currentDayKey;
+    const dayRecords = recordsForDay(selectedHistoryDate);
+    const waterRecords = dayRecords
+      .filter((record) => record.kind === "water")
+      .sort((a, b) => b.ts - a.ts);
+    const exerciseRecords = dayRecords
+      .filter((record) => record.kind !== "water")
+      .sort((a, b) => b.ts - a.ts);
+    const waterTotal = waterRecords.reduce(
+      (sum, record) => sum + record.amount,
+      0
+    );
+    const exerciseMinutes = exerciseRecords.reduce(
+      (sum, record) => sum + record.minutes,
+      0
+    );
+    const exerciseKinds = EXERCISE_ORDER.filter((kind) =>
+      exerciseRecords.some((record) => record.kind === kind)
+    );
+
+    const head = document.createElement("div");
+    head.className = "history-day__head";
+
+    const dateWrap = document.createElement("div");
+    dateWrap.className = "history-day__date";
+    const heading = document.createElement("h3");
+    heading.textContent = `${parts.month + 1}月${parts.day}日 ${
+      WEEKDAYS[parts.weekday]
+    }`;
+    const meta = document.createElement("p");
+    meta.textContent = `${parts.year}年 · ${
+      isToday ? "今天" : "历史记录"
+    } · 北京时间`;
+    dateWrap.append(heading, meta);
+
+    const badge = document.createElement("span");
+    badge.className = "history-day__badge";
+    badge.textContent = isToday ? "今天" : "历史";
+    if (!isToday) badge.classList.add("is-history");
+    head.append(dateWrap, badge);
+
+    if (dayRecords.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state history-none";
+      const icon = document.createElement("span");
+      icon.className = "empty-state__icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "🗓️";
+      const text = document.createElement("span");
+      text.textContent = "这一天暂无记录。可以在上方记录时选择日期补记。";
+      empty.append(icon, text);
+      dom.historyDay.replaceChildren(head, empty);
+      return;
+    }
+
+    const summary = document.createElement("div");
+    summary.className = "history-summary";
+    summary.append(
+      createHistoryStat(
+        "饮水",
+        waterTotal,
+        "ml",
+        "history-stat--water",
+        `${waterRecords.length} 次`
+      ),
+      createHistoryStat(
+        "运动",
+        exerciseMinutes,
+        "分钟",
+        "history-stat--exercise",
+        `${exerciseKinds.length} 项`
+      )
+    );
+
+    const sections = [];
+    sections.push(
+      createHistorySection({
+        title: "饮水记录",
+        totalText: `合计 ${numberFormatter.format(waterTotal)} ml · ${
+          waterRecords.length
+        } 次`,
+        records: waterRecords,
+        type: "water",
+      })
+    );
+    sections.push(
+      createHistoryExerciseSection(exerciseRecords, {
+        title: "运动记录",
+        totalText: `合计 ${numberFormatter.format(exerciseMinutes)} 分钟 · ${
+          exerciseKinds.length
+        } 项`,
+      })
+    );
+
+    dom.historyDay.replaceChildren(head, summary, ...sections);
+  }
+
+  function createHistoryStat(label, value, unit, className, countText) {
+    const stat = document.createElement("div");
+    stat.className = `history-stat ${className}`;
+    const labelElement = document.createElement("span");
+    labelElement.className = "history-stat__label";
+    labelElement.textContent = `${label} · ${countText}`;
+    const strong = document.createElement("strong");
+    strong.textContent = numberFormatter.format(value);
+    const unitElement = document.createElement("small");
+    unitElement.textContent = unit;
+    strong.append(unitElement);
+    stat.append(labelElement, strong);
+    return stat;
+  }
+
+  function createHistorySection({ title, totalText, records, type }) {
+    const section = document.createElement("section");
+    section.className = "history-section";
+    const head = document.createElement("div");
+    head.className = "history-section__head";
+    const heading = document.createElement("h4");
+    heading.textContent = title;
+    const total = document.createElement("span");
+    total.textContent = totalText;
+    head.append(heading, total);
+    section.append(head);
+
+    if (records.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "history-empty-line";
+      empty.textContent =
+        type === "water" ? "暂无饮水记录" : "暂无运动记录";
+      section.append(empty);
+      return section;
+    }
+
+    const list = document.createElement("ul");
+    list.className = "record-list";
+    list.setAttribute("aria-label", `${formatShortDate(selectedHistoryDate)}${title}`);
+    records.forEach((record) => {
+      const text = document.createDocumentFragment();
+      text.append("饮水 ");
+      const strong = document.createElement("strong");
+      strong.textContent = `${numberFormatter.format(record.amount)} ml`;
+      text.append(strong);
+      list.append(
+        createRecordRow({
+          record,
+          text,
+          label: "饮水",
+          ariaDate: formatShortDate(selectedHistoryDate),
+        })
+      );
+    });
+    section.append(list);
+    return section;
+  }
+
+  function createHistoryExerciseSection(records, { title, totalText }) {
+    const section = document.createElement("section");
+    section.className = "history-section";
+    const head = document.createElement("div");
+    head.className = "history-section__head";
+    const heading = document.createElement("h4");
+    heading.textContent = title;
+    const total = document.createElement("span");
+    total.textContent = totalText;
+    head.append(heading, total);
+    section.append(head);
+
+    if (records.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "history-empty-line";
+      empty.textContent = "暂无运动记录";
+      section.append(empty);
+      return section;
+    }
+
+    const groups = buildExerciseGroups(records, {
+      subheading: "当日合计",
+      ariaLabelPrefix: "当日",
+    });
+    section.append(...groups);
+    return section;
+  }
+
+  function setHistorySelection(dateKey) {
+    selectedHistoryDate = dateKey;
+    const parts = getBeijingParts(parseDayKeyTimestamp(dateKey));
+    historyYear = parts.year;
+    historyMonth = parts.month;
+  }
+
+  function changeHistoryMonth(delta) {
+    const date = new Date(Date.UTC(historyYear, historyMonth + delta, 1));
+    const candidateYear = date.getUTCFullYear();
+    const candidateMonth = date.getUTCMonth();
+    const now = getBeijingParts(Date.now());
+
+    if (
+      candidateYear < 2000 ||
+      candidateYear > now.year ||
+      (candidateYear === now.year && candidateMonth > now.month)
+    ) {
+      return;
+    }
+
+    historyYear = candidateYear;
+    historyMonth = candidateMonth;
+    renderCalendar();
+  }
+
+  function selectHistoryDate(dateKey) {
+    if (!isValidDayKey(dateKey) || dateKey > currentDayKey) return;
+    setHistorySelection(dateKey);
+    renderHistory();
+  }
+
+  function goToTodayHistory() {
+    setHistorySelection(currentDayKey);
+    renderHistory();
+  }
+
   /* ---------- actions ---------- */
 
   function addWater() {
     checkDayRollover();
+    const dateKey = getDraftDateKey("water");
+    if (!validateRecordDate(dateKey)) return;
+
+    const wasBackfill = dateKey !== currentDayKey;
     state.records.push({
       id: createRecordId(),
       kind: "water",
       amount: WATER_STEP,
-      ts: Date.now(),
+      ts: getRecordTimestamp(dateKey),
     });
     persist();
-    renderWater();
-    bumpWaterTotal();
-    showToast(`已记录 ${WATER_STEP} ml 饮水`);
+
+    if (wasBackfill) {
+      setHistorySelection(dateKey);
+      waterDraftDateKey = currentDayKey;
+    }
+    renderAll();
+    if (!wasBackfill) bumpWaterTotal();
+    showToast(
+      wasBackfill
+        ? `已补记 250 ml 到 ${formatShortDate(dateKey)}（不计入今天）`
+        : `已记录 ${WATER_STEP} ml 饮水`
+    );
   }
 
   function bumpWaterTotal() {
@@ -573,7 +1049,9 @@
     checkDayRollover();
     hideExerciseError();
 
-    const now = Date.now();
+    const dateKey = getDraftDateKey("exercise");
+    if (!validateRecordDate(dateKey)) return;
+
     let record;
 
     if (selectedExercise === "run") {
@@ -600,7 +1078,7 @@
       record = {
         id: createRecordId(),
         kind: "run",
-        ts: now,
+        ts: getRecordTimestamp(dateKey),
         km: Math.round(km * 100) / 100,
         minutes: Math.round(minutes),
       };
@@ -618,17 +1096,25 @@
       record = {
         id: createRecordId(),
         kind: selectedExercise,
-        ts: now,
+        ts: getRecordTimestamp(dateKey),
         minutes: Math.round(minutes),
       };
     }
 
+    const wasBackfill = dateKey !== currentDayKey;
     state.records.push(record);
     persist();
     clearExerciseInputs();
-    renderExercise();
-    renderExerciseForm();
-    showToast(`${EXERCISES[record.kind].label}已记录`);
+    exerciseDraftDateKey = currentDayKey;
+    if (wasBackfill) setHistorySelection(dateKey);
+    renderAll();
+    showToast(
+      wasBackfill
+        ? `${EXERCISES[record.kind].label}已补记到 ${formatShortDate(
+            dateKey
+          )}（不计入今天）`
+        : `${EXERCISES[record.kind].label}已记录`
+    );
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
@@ -661,8 +1147,7 @@
 
     const [removed] = state.records.splice(index, 1);
     persist();
-    renderWater();
-    renderExercise();
+    renderAll();
     showToast(`已撤销一条${EXERCISES[removed.kind]?.label || "饮水"}记录`);
 
     if (removed.kind === "water") {
@@ -715,6 +1200,24 @@
 
   function bindEvents() {
     dom.addWaterBtn.addEventListener("click", addWater);
+    dom.waterDateInput.addEventListener("change", () =>
+      handleDraftDateChange("water")
+    );
+    dom.exerciseDateInput.addEventListener("change", () =>
+      handleDraftDateChange("exercise")
+    );
+    dom.waterDateReset.addEventListener("click", () => resetDraftDate("water"));
+    dom.exerciseDateReset.addEventListener("click", () =>
+      resetDraftDate("exercise")
+    );
+    dom.prevMonthBtn.addEventListener("click", () => changeHistoryMonth(-1));
+    dom.nextMonthBtn.addEventListener("click", () => changeHistoryMonth(1));
+    dom.calendarTodayBtn.addEventListener("click", goToTodayHistory);
+    dom.calendarGrid.addEventListener("click", (event) => {
+      const dayButton = event.target.closest(".calendar-day");
+      if (!dayButton || dayButton.disabled) return;
+      selectHistoryDate(dayButton.dataset.date);
+    });
     dom.exerciseForm.addEventListener("submit", submitExercise);
     dom.exerciseSwitch.addEventListener("click", (event) => {
       const tab = event.target.closest(".exercise-tab");
@@ -796,6 +1299,17 @@
 
   function handleStorageEvent(event) {
     if (event.key !== STORAGE_KEY) return;
+    const previousDayKey = currentDayKey;
+    currentDayKey = getDayKey(Date.now());
+    if (waterDraftDateKey === previousDayKey) {
+      waterDraftDateKey = currentDayKey;
+    }
+    if (exerciseDraftDateKey === previousDayKey) {
+      exerciseDraftDateKey = currentDayKey;
+    }
+    if (selectedHistoryDate === previousDayKey) {
+      setHistorySelection(currentDayKey);
+    }
     state = loadState();
     selectedExercise = "run";
     renderAll();
@@ -803,32 +1317,85 @@
 
   /* ---------- time / utility ---------- */
 
+  function getBeijingParts(input = Date.now()) {
+    const date = input instanceof Date ? input : new Date(input);
+    const shifted = new Date(date.getTime() + BEIJING_OFFSET_MS);
+    return {
+      year: shifted.getUTCFullYear(),
+      month: shifted.getUTCMonth(),
+      day: shifted.getUTCDate(),
+      weekday: shifted.getUTCDay(),
+      hours: shifted.getUTCHours(),
+      minutes: shifted.getUTCMinutes(),
+      seconds: shifted.getUTCSeconds(),
+    };
+  }
+
+  function getDayKey(input = Date.now()) {
+    const parts = getBeijingParts(input);
+    return `${parts.year}-${pad2(parts.month + 1)}-${pad2(parts.day)}`;
+  }
+
+  function parseDayKeyTimestamp(dayKey) {
+    return Date.parse(`${dayKey}T12:00:00+08:00`);
+  }
+
+  function isValidDayKey(value) {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return false;
+    }
+    const [year, month, day] = value.split("-").map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    );
+  }
+
+  function formatShortDate(dayKey) {
+    const parts = getBeijingParts(parseDayKeyTimestamp(dayKey));
+    const now = getBeijingParts(Date.now());
+    if (parts.year !== now.year) {
+      return `${parts.year}/${parts.month + 1}/${parts.day}`;
+    }
+    return `${parts.month + 1}月${parts.day}日`;
+  }
+
   function updateDateChip() {
-    const now = new Date();
-    dom.todayChip.textContent = `${now.getMonth() + 1}月${now.getDate()}日 ${
-      WEEKDAYS[now.getDay()]
+    const parts = getBeijingParts(Date.now());
+    dom.todayChip.textContent = `${parts.month + 1}月${parts.day}日 ${
+      WEEKDAYS[parts.weekday]
     }`;
-    dom.todayChip.dateTime = getDayKey(now);
+    dom.todayChip.dateTime = `${parts.year}-${pad2(parts.month + 1)}-${pad2(
+      parts.day
+    )}`;
   }
 
   function checkDayRollover() {
-    const nextDayKey = getDayKey(new Date());
+    const previousDayKey = currentDayKey;
+    const nextDayKey = getDayKey(Date.now());
     if (nextDayKey === currentDayKey) return;
     currentDayKey = nextDayKey;
+
+    if (waterDraftDateKey === previousDayKey) {
+      waterDraftDateKey = currentDayKey;
+    }
+    if (exerciseDraftDateKey === previousDayKey) {
+      exerciseDraftDateKey = currentDayKey;
+    }
+    if (selectedHistoryDate === previousDayKey) {
+      setHistorySelection(currentDayKey);
+    }
+
     updateDateChip();
     renderAll();
     showToast("新的一天，今日记录已更新");
   }
 
-  function getDayKey(date) {
-    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
-      date.getDate()
-    )}`;
-  }
-
   function formatTime(ts) {
-    const date = new Date(ts);
-    return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+    const parts = getBeijingParts(ts);
+    return `${pad2(parts.hours)}:${pad2(parts.minutes)}`;
   }
 
   function pad2(value) {

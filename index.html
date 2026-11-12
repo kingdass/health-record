@@ -119,9 +119,24 @@
         </div>
       </div>
 
+      <div class="record-date-row" id="waterDateRow">
+        <span class="record-date-row__icon" aria-hidden="true">📅</span>
+        <label class="record-date-row__label" for="waterDateInput">记录到</label>
+        <input
+          class="record-date-input"
+          id="waterDateInput"
+          type="date"
+          min="2000-01-01"
+          aria-label="饮水记录日期"
+        >
+        <span class="record-date-badge" id="waterDateBadge">今天</span>
+        <button class="record-date-reset" id="waterDateReset" type="button" hidden>回到今天</button>
+      </div>
+      <p class="backfill-note" id="waterBackfillNote" hidden></p>
+
       <button class="water-button" id="addWaterBtn" type="button">
         <span class="water-button__icon" aria-hidden="true">+</span>
-        <span>记录 250 ml</span>
+        <span id="addWaterLabel">记录 250 ml</span>
       </button>
 
       <div class="record-block">
@@ -169,6 +184,21 @@
         </p>
 
         <form id="exerciseForm" novalidate>
+          <div class="record-date-row record-date-row--exercise" id="exerciseDateRow">
+            <span class="record-date-row__icon" aria-hidden="true">📅</span>
+            <label class="record-date-row__label" for="exerciseDateInput">记录到</label>
+            <input
+              class="record-date-input"
+              id="exerciseDateInput"
+              type="date"
+              min="2000-01-01"
+              aria-label="运动记录日期"
+            >
+            <span class="record-date-badge" id="exerciseDateBadge">今天</span>
+            <button class="record-date-reset" id="exerciseDateReset" type="button" hidden>回到今天</button>
+          </div>
+          <p class="backfill-note" id="exerciseBackfillNote" hidden></p>
+
           <div class="field-row" id="runFields">
             <label class="field">
               <span class="field__label">公里数</span>
@@ -253,6 +283,38 @@
           <span>今天还没有运动记录，选一个项目开始吧。</span>
         </div>
       </div>
+    </section>
+
+    <section class="card history-card" aria-labelledby="historyTitle">
+      <div class="card-heading">
+        <div class="section-icon section-icon--history" aria-hidden="true">🗓️</div>
+        <div class="card-heading__text">
+          <h2 id="historyTitle">历史记录</h2>
+          <p>按北京时间 · 选择日期查看</p>
+        </div>
+        <span class="status-pill status-pill--history">北京时间</span>
+      </div>
+
+      <div class="history-calendar">
+        <div class="calendar-head">
+          <button class="calendar-nav" id="prevMonthBtn" type="button" aria-label="上个月">‹</button>
+          <div class="calendar-heading">
+            <strong id="calendarMonthLabel">2026年11月</strong>
+            <span id="calendarTodayHint">今天 11月12日</span>
+          </div>
+          <button class="calendar-nav" id="nextMonthBtn" type="button" aria-label="下个月">›</button>
+        </div>
+        <div class="calendar-weekdays" aria-hidden="true">
+          <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+        </div>
+        <div class="calendar-grid" id="calendarGrid" role="group" aria-label="历史记录日历"></div>
+        <div class="calendar-foot">
+          <button class="calendar-today-btn" id="calendarTodayBtn" type="button">回到今天</button>
+          <span class="calendar-legend"><i aria-hidden="true"></i>有记录</span>
+        </div>
+      </div>
+
+      <div class="history-day" id="historyDay" aria-live="polite"></div>
     </section>
 
     <p class="privacy-note">
