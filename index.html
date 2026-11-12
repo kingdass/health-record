@@ -43,7 +43,6 @@
           </button>
         </div>
       </div>
-      <time class="today-chip" id="todayChip">11月10日 周一</time>
     </div>
 
     <form class="nickname-editor" id="nicknameEditor" hidden>
@@ -63,6 +62,35 @@
   </header>
 
   <main class="app-main">
+    <section class="day-toolbar" aria-labelledby="dayToolbarTitle">
+      <div class="day-toolbar__top">
+        <div class="day-toolbar__icon" aria-hidden="true">🗓️</div>
+        <div class="day-toolbar__heading">
+          <h2 id="dayToolbarTitle">记录日期</h2>
+          <p class="day-toolbar__hint" id="selectedDateHint" aria-live="polite">今天 · 11月12日 周四</p>
+        </div>
+        <span class="day-badge" id="selectedDateBadge">今天</span>
+      </div>
+      <div class="day-toolbar__switch">
+        <button class="day-arrow" id="prevDayBtn" type="button" aria-label="前一天">‹</button>
+        <label class="day-picker" for="selectedDateInput">
+          <span class="day-picker__label">选择日期</span>
+          <input
+            class="day-picker__input"
+            id="selectedDateInput"
+            type="date"
+            min="2000-01-01"
+            aria-label="选择查看和记录的日期"
+          >
+        </label>
+        <button class="day-arrow" id="nextDayBtn" type="button" aria-label="后一天">›</button>
+      </div>
+      <div class="day-toolbar__foot">
+        <span class="day-toolbar__scope" id="selectedDateScope">正在查看今天 · 下方内容均按北京时间</span>
+        <button class="day-today-btn" id="dayTodayBtn" type="button" hidden>回到今天</button>
+      </div>
+    </section>
+
     <section class="card water-card" aria-labelledby="waterTitle">
       <div class="card-heading">
         <div class="section-icon section-icon--water" aria-hidden="true">💧</div>
@@ -98,7 +126,7 @@
             <div class="ring-total">
               <strong id="waterTotal">0</strong><span>ml</span>
             </div>
-            <span class="ring-label">今日已饮</span>
+            <span class="ring-label" id="waterRingLabel">今日已饮</span>
           </div>
         </div>
 
@@ -119,21 +147,6 @@
         </div>
       </div>
 
-      <div class="record-date-row" id="waterDateRow">
-        <span class="record-date-row__icon" aria-hidden="true">📅</span>
-        <label class="record-date-row__label" for="waterDateInput">记录到</label>
-        <input
-          class="record-date-input"
-          id="waterDateInput"
-          type="date"
-          min="2000-01-01"
-          aria-label="饮水记录日期"
-        >
-        <span class="record-date-badge" id="waterDateBadge">今天</span>
-        <button class="record-date-reset" id="waterDateReset" type="button" hidden>回到今天</button>
-      </div>
-      <p class="backfill-note" id="waterBackfillNote" hidden></p>
-
       <button class="water-button" id="addWaterBtn" type="button">
         <span class="water-button__icon" aria-hidden="true">+</span>
         <span id="addWaterLabel">记录 250 ml</span>
@@ -147,7 +160,7 @@
         <ul class="record-list" id="waterRecordList" aria-label="今日饮水记录"></ul>
         <div class="empty-state" id="waterEmpty">
           <span class="empty-state__icon" aria-hidden="true">🥛</span>
-          <span>还没有饮水记录，点上方按钮记下第一杯水吧。</span>
+          <span id="waterEmptyText">还没有饮水记录，点上方按钮记下第一杯水吧。</span>
         </div>
       </div>
     </section>
@@ -184,21 +197,6 @@
         </p>
 
         <form id="exerciseForm" novalidate>
-          <div class="record-date-row record-date-row--exercise" id="exerciseDateRow">
-            <span class="record-date-row__icon" aria-hidden="true">📅</span>
-            <label class="record-date-row__label" for="exerciseDateInput">记录到</label>
-            <input
-              class="record-date-input"
-              id="exerciseDateInput"
-              type="date"
-              min="2000-01-01"
-              aria-label="运动记录日期"
-            >
-            <span class="record-date-badge" id="exerciseDateBadge">今天</span>
-            <button class="record-date-reset" id="exerciseDateReset" type="button" hidden>回到今天</button>
-          </div>
-          <p class="backfill-note" id="exerciseBackfillNote" hidden></p>
-
           <div class="field-row" id="runFields">
             <label class="field">
               <span class="field__label">公里数</span>
@@ -274,47 +272,15 @@
 
       <div class="record-block record-block--exercise">
         <div class="record-heading">
-          <h3>今日已记录</h3>
+          <h3 id="exerciseRecordsTitle">今日已记录</h3>
           <span id="exerciseCount">0 项</span>
         </div>
         <div class="exercise-summary" id="exerciseSummary"></div>
         <div class="empty-state" id="exerciseEmpty">
           <span class="empty-state__icon" aria-hidden="true">✨</span>
-          <span>今天还没有运动记录，选一个项目开始吧。</span>
+          <span id="exerciseEmptyText">今天还没有运动记录，选一个项目开始吧。</span>
         </div>
       </div>
-    </section>
-
-    <section class="card history-card" aria-labelledby="historyTitle">
-      <div class="card-heading">
-        <div class="section-icon section-icon--history" aria-hidden="true">🗓️</div>
-        <div class="card-heading__text">
-          <h2 id="historyTitle">历史记录</h2>
-          <p>按北京时间 · 选择日期查看</p>
-        </div>
-        <span class="status-pill status-pill--history">北京时间</span>
-      </div>
-
-      <div class="history-calendar">
-        <div class="calendar-head">
-          <button class="calendar-nav" id="prevMonthBtn" type="button" aria-label="上个月">‹</button>
-          <div class="calendar-heading">
-            <strong id="calendarMonthLabel">2026年11月</strong>
-            <span id="calendarTodayHint">今天 11月12日</span>
-          </div>
-          <button class="calendar-nav" id="nextMonthBtn" type="button" aria-label="下个月">›</button>
-        </div>
-        <div class="calendar-weekdays" aria-hidden="true">
-          <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
-        </div>
-        <div class="calendar-grid" id="calendarGrid" role="group" aria-label="历史记录日历"></div>
-        <div class="calendar-foot">
-          <button class="calendar-today-btn" id="calendarTodayBtn" type="button">回到今天</button>
-          <span class="calendar-legend"><i aria-hidden="true"></i>有记录</span>
-        </div>
-      </div>
-
-      <div class="history-day" id="historyDay" aria-live="polite"></div>
     </section>
 
     <p class="privacy-note">
